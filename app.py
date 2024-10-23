@@ -1,6 +1,5 @@
 import streamlit as st
 from docx import Document
-from docx.shared import Pt
 import io
 import requests
 
@@ -23,9 +22,7 @@ if uploaded_file is not None:
     try:
         # Leer el documento DOCX
         doc = Document(uploaded_file)
-        full_text = []
-        for para in doc.paragraphs:
-            full_text.append(para.text)
+        full_text = [para.text for para in doc.paragraphs]
         original_text = '\n'.join(full_text)
 
         st.subheader("Contenido Original del Documento")
@@ -105,13 +102,13 @@ if uploaded_file is not None:
                 # Agregar snippets de las búsquedas
                 if 'organic' in data:
                     for item in data['organic'][:3]:  # Limitar a los primeros 3 resultados
-                        enrichment_data += f"- {item.get('title')}: {item.get('snippet')}\n"
+                        enrichment_data += f"- **{item.get('title')}**: {item.get('snippet')}\n"
                 else:
                     enrichment_data += "No se encontraron resultados relevantes.\n"
 
             # Preparar el prompt para la API de OpenRouter con los datos de enriquecimiento
             prompt = (
-                "Agrega subtítulos y enriquece el siguiente documento con datos adicionales donde sea posible. Utiliza la información adicional proporcionada a continuación:\n\n"
+                "Mantén todo el contenido original del siguiente documento. Agrega subtítulos y enriquece el documento con datos adicionales donde sea posible. Utiliza la información adicional proporcionada a continuación:\n\n"
                 f"{original_text}\n\n"
                 f"Datos Adicionales:{enrichment_data}"
             )
@@ -152,12 +149,13 @@ if uploaded_file is not None:
                 # Crear un nuevo documento DOCX con el contenido enriquecido
                 new_doc = Document()
                 for line in enriched_text.split('\n'):
-                    if line.strip().startswith("### "):
+                    stripped_line = line.strip()
+                    if stripped_line.startswith("### "):
                         # Subtítulos de nivel 2
-                        new_doc.add_heading(line.replace("### ", ""), level=2)
-                    elif line.strip().startswith("## "):
+                        new_doc.add_heading(stripped_line.replace("### ", ""), level=2)
+                    elif stripped_line.startswith("## "):
                         # Subtítulos de nivel 1
-                        new_doc.add_heading(line.replace("## ", ""), level=1)
+                        new_doc.add_heading(stripped_line.replace("## ", ""), level=1)
                     else:
                         new_doc.add_paragraph(line)
 
