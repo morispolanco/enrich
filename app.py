@@ -13,6 +13,7 @@ st.set_page_config(
 st.title("📄 Enriquecedor de Documentos DOCX")
 st.write("""
     Sube tu documento en formato DOCX, y esta aplicación agregará subtítulos y enriquecerá su contenido utilizando las APIs de Serper y OpenRouter.
+    El documento resultante será más extenso que el original.
 """)
 
 # Subida de archivo
@@ -82,7 +83,7 @@ if uploaded_file is not None:
 
         with st.spinner("Extrayendo temas clave del documento..."):
             topics = extract_topics(original_text)
-        
+
         if topics:
             st.subheader("Temas Clave Extraídos")
             st.write(", ".join(topics))
@@ -108,9 +109,9 @@ if uploaded_file is not None:
 
             # Preparar el prompt para la API de OpenRouter con los datos de enriquecimiento
             prompt = (
-                "Mantén todo el contenido original del siguiente documento. Agrega subtítulos y enriquece el documento con datos adicionales donde sea posible. Utiliza la información adicional proporcionada a continuación:\n\n"
+                "Mantén todo el contenido original del siguiente documento y enriquece el documento agregando información adicional relevante, ejemplos, explicaciones y datos donde sea posible. Asegúrate de que el documento resultante sea más extenso que el original.\n\n"
                 f"{original_text}\n\n"
-                f"Datos Adicionales:{enrichment_data}"
+                f"Datos Adicionales para Enriquecimiento:{enrichment_data}"
             )
 
             # Función para obtener el texto enriquecido usando OpenRouter
@@ -143,34 +144,47 @@ if uploaded_file is not None:
                 enriched_text = get_enriched_text(prompt)
 
             if enriched_text:
-                st.subheader("Contenido Enriquecido del Documento")
-                st.text_area("", enriched_text, height=300)
+                # Verificar que el documento enriquecido sea más largo que el original
+                original_length = len(original_text)
+                enriched_length = len(enriched_text)
 
-                # Crear un nuevo documento DOCX con el contenido enriquecido
-                new_doc = Document()
-                for line in enriched_text.split('\n'):
-                    stripped_line = line.strip()
-                    if stripped_line.startswith("### "):
-                        # Subtítulos de nivel 2
-                        new_doc.add_heading(stripped_line.replace("### ", ""), level=2)
-                    elif stripped_line.startswith("## "):
-                        # Subtítulos de nivel 1
-                        new_doc.add_heading(stripped_line.replace("## ", ""), level=1)
-                    else:
-                        new_doc.add_paragraph(line)
+                if enriched_length > original_length:
+                    st.subheader("Contenido Enriquecido del Documento")
+                    st.text_area("", enriched_text, height=300)
 
-                # Guardar el nuevo documento en un objeto BytesIO
-                byte_io = io.BytesIO()
-                new_doc.save(byte_io)
-                byte_io.seek(0)
+                    # Crear un nuevo documento DOCX con el contenido enriquecido
+                    new_doc = Document()
+                    for line in enriched_text.split('\n'):
+                        stripped_line = line.strip()
+                        if stripped_line.startswith("### "):
+                            # Subtítulos de nivel 2
+                            new_doc.add_heading(stripped_line.replace("### ", ""), level=2)
+                        elif stripped_line.startswith("## "):
+                            # Subtítulos de nivel 1
+                            new_doc.add_heading(stripped_line.replace("## ", ""), level=1)
+                        else:
+                            new_doc.add_paragraph(line)
 
-                st.success("¡Documento enriquecido creado con éxito!")
-                st.download_button(
-                    label="📥 Descargar Documento Enriquecido",
-                    data=byte_io,
-                    file_name="documento_enriquecido.docx",
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                )
+                    # Guardar el nuevo documento en un objeto BytesIO
+                    byte_io = io.BytesIO()
+                    new_doc.save(byte_io)
+                    byte_io.seek(0)
+
+                    st.success("¡Documento enriquecido creado con éxito!")
+                    st.download_button(
+                        label="📥 Descargar Documento Enriquecido",
+                        data=byte_io,
+                        file_name="documento_enriquecido.docx",
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    )
+                else:
+                    st.warning(
+                        "El documento enriquecido no es más extenso que el original. Por favor, verifica el contenido o intenta con otro documento."
+                    )
+                    st.subheader("Contenido Enriquecido del Documento")
+                    st.text_area("", enriched_text, height=300)
+            else:
+                st.error("No se pudo generar un documento enriquecido.")
         else:
             st.warning("No se pudieron extraer temas clave del documento para realizar búsquedas.")
     except Exception as e:
