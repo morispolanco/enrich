@@ -1,75 +1,70 @@
 import streamlit as st
-import requests
+import openai
 from docx import Document
 from io import BytesIO
-from docx.shared import RGBColor
 
 # Configuración de las API keys usando Secrets de Streamlit
-serper_api_key = st.secrets["SERPER_API_KEY"]
+openai_api_key = st.secrets["OPENROUTER_API_KEY"]
 
-# Función para procesar y ampliar el documento completo
-def enrich_document(doc):
-    full_text = "\n".join([paragraph.text for paragraph in doc.paragraphs])
-    enriched_text = expand_text(full_text)
-    return enriched_text
+# Función para procesar el documento Docx mejorando la redacción y agregando divisiones
+def refine_document(doc):
+    refined_paragraphs = []
+    for paragraph in doc.paragraphs:
+        refined_text = refine_text(paragraph.text)
+        refined_paragraphs.append(refined_text)
+    return refined_paragraphs
 
-# Función para ampliar el texto completo del documento utilizando la API de Serper
-def expand_text(text):
-    # Si el texto no está vacío, realizar una búsqueda con Serper
+# Función para mejorar la redacción utilizando la API de OpenRouter
+def refine_text(text):
     if text.strip():
-        response_serper = requests.post(
-            "https://google.serper.dev/search",
+        response_openrouter = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
             headers={
-                "X-API-KEY": serper_api_key,
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {openai_api_key}"
             },
-            json={"q": text}
+            json={
+                "model": "openai/gpt-4o-mini",
+                "messages": [{"role": "user", "content": f"Please improve the following text: {text}"}]
+            }
         )
-        response_data = response_serper.json()
-        search_results = response_data.get("organic", [])
-
-        # Si hay resultados, ampliar el texto con información adicional
-        if search_results:
-            snippet = search_results[0].get('snippet', '')
-            enriched_text = f"{text}\n\nInformación adicional:\n{snippet}\n"
-        else:
-            enriched_text = text + "\n\n(No se encontraron datos adicionales para este documento)\n"
+        response_data = response_openrouter.json()
+        refined_text = response_data.get("choices", [{}])[0].get("message", {}).get("content", "")
     else:
-        enriched_text = text
+        refined_text = text
 
-    return enriched_text
+    return refined_text
 
-# Función para agregar texto en rojo en el documento
-def add_text_in_red(doc, text):
-    paragraph = doc.add_paragraph()
-    run = paragraph.add_run(text)
-    run.font.color.rgb = RGBColor(255, 0, 0)  # Establece el color del texto en rojo
+# Función para agregar divisiones en el documento
+def add_divisions(doc):
+    doc.add_paragraph("\n--- División del documento ---\n")
 
 # Configuración de la aplicación Streamlit
-st.title("Ampliador de Documentos Docx")
+st.title("Mejora y División de Documentos Docx")
 
 uploaded_file = st.file_uploader("Sube un archivo Docx", type="docx")
 if uploaded_file is not None:
     # Cargar el documento
     doc = Document(uploaded_file)
-    enriched_content = enrich_document(doc)
+    refined_paragraphs = refine_document(doc)
     
-    # Crear un nuevo documento enriquecido
-    enriched_doc = Document()
-    enriched_doc.add_paragraph("Contenido Original:")
-    enriched_doc.add_paragraph("\n".join([paragraph.text for paragraph in doc.paragraphs]))
-    enriched_doc.add_paragraph("\nAmpliaciones:")
-    add_text_in_red(enriched_doc, enriched_content)
+    # Crear un nuevo documento refinado con divisiones
+    refined_doc = Document()
+    for i, refined_paragraph in enumerate(refined_paragraphs):
+        refined_doc.add_paragraph(refined_paragraph)
+        # Agregar divisiones entre cada párrafo
+        if i < len(refined_paragraphs) - 1:
+            add_divisions(refined_doc)
 
     # Guardar el documento en un objeto BytesIO
-    enriched_doc_io = BytesIO()
-    enriched_doc.save(enriched_doc_io)
-    enriched_doc_io.seek(0)
+    refined_doc_io = BytesIO()
+    refined_doc.save(refined_doc_io)
+    refined_doc_io.seek(0)
     
-    # Descargar el documento enriquecido
+    # Descargar el documento refinado
     st.download_button(
-        label="Descargar Documento Ampliado",
-        data=enriched_doc_io,
-        file_name="documento_ampliado.docx",
+        label="Descargar Documento Refinado",
+        data=refined_doc_io,
+        file_name="documento_refinado.docx",
         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     )
