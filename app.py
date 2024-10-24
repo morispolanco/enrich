@@ -13,7 +13,7 @@ st.set_page_config(
 
 st.title("📄 Agregador de Subtítulos para Documentos DOCX")
 st.write("""
-    Sube tu documento en formato DOCX, y esta aplicación agregará subtítulos al contenido utilizando la API de OpenRouter.
+    Sube tu documento en formato DOCX, y esta aplicación agregará subtítulos al contenido sin modificar ni acortar el texto original, utilizando la API de OpenRouter.
 """)
 
 # Subida de archivo
@@ -36,7 +36,8 @@ if uploaded_file is not None:
             prompt = (
                 "Analiza el siguiente texto y agrega subtítulos apropiados donde sea relevante. "
                 "Los subtítulos deben ser claros y resumir el contenido que sigue. "
-                "Devuelve el texto modificado con los subtítulos añadidos, utilizando '## ' antes de cada subtítulo.\n\n"
+                "No modifiques ni acortes el texto original; simplemente inserta los subtítulos en las posiciones adecuadas. "
+                "Utiliza '## ' antes de cada subtítulo para identificarlos.\n\n"
                 f"{text}"
             )
             api_key = st.secrets["OPENROUTER_API_KEY"]
@@ -77,13 +78,24 @@ if uploaded_file is not None:
 
             # Crear un nuevo documento DOCX con los subtítulos
             new_doc = Document()
-            for line in subtitled_text.split('\n'):
+            lines = subtitled_text.split('\n')
+            i = 0
+            while i < len(lines):
+                line = lines[i]
                 if line.strip().startswith("## "):
-                    # Subtítulos de nivel 1
-                    new_doc.add_heading(line.replace("## ", "").strip(), level=1)
+                    # Subtítulo de nivel 1
+                    subtitle = line.replace("## ", "").strip()
+                    new_doc.add_heading(subtitle, level=1)
+                    i += 1
                 else:
-                    new_doc.add_paragraph(line.strip())
-
+                    # Añadir párrafos sin modificar
+                    paragraph_lines = []
+                    while i < len(lines) and not lines[i].strip().startswith("## "):
+                        paragraph_lines.append(lines[i])
+                        i += 1
+                    paragraph_text = '\n'.join(paragraph_lines).strip()
+                    if paragraph_text:
+                        new_doc.add_paragraph(paragraph_text)
             # Guardar el nuevo documento en un objeto BytesIO
             byte_io = io.BytesIO()
             new_doc.save(byte_io)
