@@ -51,15 +51,12 @@ if uploaded_file is not None:
     enriched_doc = Document()
     enriched_doc.add_paragraph(enriched_content)
 
-    # Mostrar el contenido enriquecido en la aplicación
-    st.subheader("Contenido Ampliado")
-    st.write(enriched_content)
-    
-    # Descargar el documento enriquecido
+    # Guardar el documento en un objeto BytesIO
     enriched_doc_io = BytesIO()
     enriched_doc.save(enriched_doc_io)
     enriched_doc_io.seek(0)
     
+    # Descargar el documento enriquecido
     st.download_button(
         label="Descargar Documento Ampliado",
         data=enriched_doc_io,
