@@ -1,79 +1,46 @@
 import streamlit as st
-import requests
 from docx import Document
 from io import BytesIO
 
-# Configuración de las API keys usando Secrets de Streamlit
-openai_api_key = st.secrets["OPENROUTER_API_KEY"]
-
-# Función para procesar el documento Docx mejorando la redacción y agregando divisiones
-def refine_document(doc):
-    refined_paragraphs = []
+# Función para dividir el documento en secciones y poner títulos
+def divide_document(doc):
+    section_counter = 1
+    divided_sections = []
     for paragraph in doc.paragraphs:
-        refined_text = refine_text(paragraph.text)
-        refined_paragraphs.append(refined_text)
-    return refined_paragraphs
+        if paragraph.text.strip():  # Solo procesar párrafos que no estén vacíos
+            section_title = f"Sección {section_counter}"
+            divided_sections.append((section_title, paragraph.text))
+            section_counter += 1
+    return divided_sections
 
-# Función para mejorar la redacción utilizando la API de OpenRouter
-def refine_text(text):
-    if text.strip():
-        try:
-            response_openrouter = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers={
-                    "Content-Type": "application/json",
-                    "Authorization": f"Bearer {openai_api_key}"
-                },
-                json={
-                    "model": "openai/gpt-4o-mini",
-                    "messages": [{"role": "user", "content": f"Please improve the following text: {text}"}]
-                }
-            )
-            # Verificar si la respuesta es exitosa
-            if response_openrouter.status_code == 200:
-                response_data = response_openrouter.json()
-                refined_text = response_data.get("choices", [{}])[0].get("message", {}).get("content", "")
-            else:
-                st.error("Error con la API de OpenRouter: " + response_openrouter.text)
-                refined_text = text  # Devolver el texto original si hay un error
-        except Exception as e:
-            st.error(f"Error al conectar con la API de OpenRouter: {e}")
-            refined_text = text  # Devolver el texto original si hay una excepción
-    else:
-        refined_text = text
-
-    return refined_text
-
-# Función para agregar divisiones en el documento
-def add_divisions(doc):
-    doc.add_paragraph("\n--- División del documento ---\n")
+# Función para agregar las secciones con títulos al documento
+def add_sections_to_document(sections, doc):
+    for section_title, section_content in sections:
+        doc.add_heading(section_title, level=2)
+        doc.add_paragraph(section_content)
 
 # Configuración de la aplicación Streamlit
-st.title("Mejora y División de Documentos Docx")
+st.title("Divisor de Documentos Docx en Secciones")
 
 uploaded_file = st.file_uploader("Sube un archivo Docx", type="docx")
 if uploaded_file is not None:
     # Cargar el documento
     doc = Document(uploaded_file)
-    refined_paragraphs = refine_document(doc)
+    divided_sections = divide_document(doc)
     
-    # Crear un nuevo documento refinado con divisiones
-    refined_doc = Document()
-    for i, refined_paragraph in enumerate(refined_paragraphs):
-        refined_doc.add_paragraph(refined_paragraph)
-        # Agregar divisiones entre cada párrafo
-        if i < len(refined_paragraphs) - 1:
-            add_divisions(refined_doc)
+    # Crear un nuevo documento con las secciones divididas
+    divided_doc = Document()
+    add_sections_to_document(divided_sections, divided_doc)
 
     # Guardar el documento en un objeto BytesIO
-    refined_doc_io = BytesIO()
-    refined_doc.save(refined_doc_io)
-    refined_doc_io.seek(0)
+    divided_doc_io = BytesIO()
+    divided_doc.save(divided_doc_io)
+    divided_doc_io.seek(0)
     
-    # Descargar el documento refinado
+    # Descargar el documento dividido
     st.download_button(
-        label="Descargar Documento Refinado",
-        data=refined_doc_io,
-        file_name="documento_refinado.docx",
+        label="Descargar Documento Dividido",
+        data=divided_doc_io,
+        file_name="documento_dividido.docx",
         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     )
