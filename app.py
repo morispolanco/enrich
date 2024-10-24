@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 from docx import Document
 from io import BytesIO
+from docx.shared import RGBColor
 
 # Configuración de las API keys usando Secrets de Streamlit
 serper_api_key = st.secrets["SERPER_API_KEY"]
@@ -38,6 +39,12 @@ def expand_text(text):
 
     return enriched_text
 
+# Función para agregar texto en rojo en el documento
+def add_text_in_red(doc, text):
+    paragraph = doc.add_paragraph()
+    run = paragraph.add_run(text)
+    run.font.color.rgb = RGBColor(255, 0, 0)  # Establece el color del texto en rojo
+
 # Configuración de la aplicación Streamlit
 st.title("Ampliador de Documentos Docx")
 
@@ -49,7 +56,10 @@ if uploaded_file is not None:
     
     # Crear un nuevo documento enriquecido
     enriched_doc = Document()
-    enriched_doc.add_paragraph(enriched_content)
+    enriched_doc.add_paragraph("Contenido Original:")
+    enriched_doc.add_paragraph("\n".join([paragraph.text for paragraph in doc.paragraphs]))
+    enriched_doc.add_paragraph("\nAmpliaciones:")
+    add_text_in_red(enriched_doc, enriched_content)
 
     # Guardar el documento en un objeto BytesIO
     enriched_doc_io = BytesIO()
