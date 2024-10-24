@@ -1,4 +1,5 @@
 import streamlit as st
+import requests
 from docx import Document
 from io import BytesIO
 
@@ -16,19 +17,28 @@ def refine_document(doc):
 # Función para mejorar la redacción utilizando la API de OpenRouter
 def refine_text(text):
     if text.strip():
-        response_openrouter = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {openai_api_key}"
-            },
-            json={
-                "model": "openai/gpt-4o-mini",
-                "messages": [{"role": "user", "content": f"Please improve the following text: {text}"}]
-            }
-        )
-        response_data = response_openrouter.json()
-        refined_text = response_data.get("choices", [{}])[0].get("message", {}).get("content", "")
+        try:
+            response_openrouter = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {openai_api_key}"
+                },
+                json={
+                    "model": "openai/gpt-4o-mini",
+                    "messages": [{"role": "user", "content": f"Please improve the following text: {text}"}]
+                }
+            )
+            # Verificar si la respuesta es exitosa
+            if response_openrouter.status_code == 200:
+                response_data = response_openrouter.json()
+                refined_text = response_data.get("choices", [{}])[0].get("message", {}).get("content", "")
+            else:
+                st.error("Error con la API de OpenRouter: " + response_openrouter.text)
+                refined_text = text  # Devolver el texto original si hay un error
+        except Exception as e:
+            st.error(f"Error al conectar con la API de OpenRouter: {e}")
+            refined_text = text  # Devolver el texto original si hay una excepción
     else:
         refined_text = text
 
