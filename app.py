@@ -12,7 +12,7 @@ st.set_page_config(
 
 st.title("📄 Enriquecedor de Documentos DOCX")
 st.write("""
-    Sube tu documento en formato DOCX, y esta aplicación agregará subtítulos y enriquecerá su contenido utilizando las APIs de Serper y OpenRouter.
+    Sube tu documento en formato DOCX, y esta aplicación enriquecerá su contenido utilizando las APIs de Serper y OpenRouter.
     El documento resultante será más extenso que el original.
 """)
 
@@ -99,7 +99,7 @@ if uploaded_file is not None:
             # Preparar la información obtenida de las búsquedas para el enriquecimiento
             enrichment_data = ""
             for topic, data in search_results.items():
-                enrichment_data += f"\n\n### {topic}\n"
+                enrichment_data += f"\n\nInformación sobre **{topic}**:\n"
                 # Agregar snippets de las búsquedas
                 if 'organic' in data:
                     for item in data['organic'][:3]:  # Limitar a los primeros 3 resultados
@@ -155,15 +155,7 @@ if uploaded_file is not None:
                     # Crear un nuevo documento DOCX con el contenido enriquecido
                     new_doc = Document()
                     for line in enriched_text.split('\n'):
-                        stripped_line = line.strip()
-                        if stripped_line.startswith("### "):
-                            # Subtítulos de nivel 2
-                            new_doc.add_heading(stripped_line.replace("### ", ""), level=2)
-                        elif stripped_line.startswith("## "):
-                            # Subtítulos de nivel 1
-                            new_doc.add_heading(stripped_line.replace("## ", ""), level=1)
-                        else:
-                            new_doc.add_paragraph(line)
+                        new_doc.add_paragraph(line)
 
                     # Guardar el nuevo documento en un objeto BytesIO
                     byte_io = io.BytesIO()
