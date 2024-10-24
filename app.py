@@ -6,14 +6,14 @@ import requests
 
 # Configuración de la página
 st.set_page_config(
-    page_title="📄 Enriquecedor de Documentos DOCX",
+    page_title="📄 Agregador de Subtítulos para Documentos DOCX",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-st.title("📄 Enriquecedor de Documentos DOCX")
+st.title("📄 Agregador de Subtítulos para Documentos DOCX")
 st.write("""
-    Sube tu documento en formato DOCX, y esta aplicación agregará subtítulos y enriquecerá su contenido utilizando las APIs de Serper y OpenRouter.
+    Sube tu documento en formato DOCX, y esta aplicación agregará subtítulos al contenido utilizando la API de OpenRouter.
 """)
 
 # Subida de archivo
@@ -31,29 +31,12 @@ if uploaded_file is not None:
         st.subheader("Contenido Original del Documento")
         st.text_area("", original_text, height=300)
 
-        # Función para realizar búsquedas con Serper API
-        def search_with_serper(query):
-            serper_api_key = st.secrets["SERPER_API_KEY"]
-            url = "https://google.serper.dev/search"
-            headers = {
-                "X-API-KEY": serper_api_key,
-                "Content-Type": "application/json"
-            }
-            data = {
-                "q": query
-            }
-            response = requests.post(url, headers=headers, json=data)
-            if response.status_code == 200:
-                return response.json()
-            else:
-                st.error(f"Error en la API de Serper: {response.status_code}")
-                st.error(response.text)
-                return None
-
-        # Extraer temas clave del documento para realizar búsquedas relevantes
-        def extract_topics(text, max_topics=5):
+        # Función para generar subtítulos usando OpenRouter
+        def generate_subtitles(text):
             prompt = (
-                "Extrae los temas o palabras clave más relevantes del siguiente texto, separados por comas:\n\n"
+                "Analiza el siguiente texto y agrega subtítulos apropiados donde sea relevante. "
+                "Los subtítulos deben ser claros y resumir el contenido que sigue. "
+                "Devuelve el texto modificado con los subtítulos añadidos, utilizando '## ' antes de cada subtítulo.\n\n"
                 f"{text}"
             )
             api_key = st.secrets["OPENROUTER_API_KEY"]
@@ -63,7 +46,7 @@ if uploaded_file is not None:
                 "Authorization": f"Bearer {api_key}"
             }
             data = {
-                "model": "openai/gpt-4o-mini",
+                "model": "openai/gpt-3.5-turbo",
                 "messages": [
                     {
                         "role": "user",
@@ -74,106 +57,46 @@ if uploaded_file is not None:
             response = requests.post(url, headers=headers, json=data)
             if response.status_code == 200:
                 response_json = response.json()
-                topics = response_json['choices'][0]['message']['content']
-                # Limitar el número de temas
-                topics_list = [topic.strip() for topic in topics.split(',')][:max_topics]
-                return topics_list
-            else:
-                st.error(f"Error en la API de OpenRouter al extraer temas: {response.status_code}")
-                st.error(response.text)
-                return []
-
-        with st.spinner("Extrayendo temas clave del documento..."):
-            topics = extract_topics(original_text)
-        
-        if topics:
-            st.subheader("Temas Clave Extraídos")
-            st.write(", ".join(topics))
-
-            # Realizar búsquedas en Serper para cada tema
-            search_results = {}
-            for topic in topics:
-                with st.spinner(f"Realizando búsqueda para: {topic}"):
-                    result = search_with_serper(topic)
-                    if result:
-                        search_results[topic] = result
-
-            # Preparar la información obtenida de las búsquedas para el enriquecimiento
-            enrichment_data = ""
-            for topic, data in search_results.items():
-                enrichment_data += f"\n\n### {topic}\n"
-                # Agregar snippets de las búsquedas
-                if 'organic' in data:
-                    for item in data['organic'][:3]:  # Limitar a los primeros 3 resultados
-                        enrichment_data += f"- {item.get('title')}: {item.get('snippet')}\n"
+                if 'choices' in response_json and 'message' in response_json['choices'][0]:
+                    modified_text = response_json['choices'][0]['message']['content']
+                    return modified_text
                 else:
-                    enrichment_data += "No se encontraron resultados relevantes.\n"
-
-            # Preparar el prompt para la API de OpenRouter con los datos de enriquecimiento
-            prompt = (
-                "Agrega subtítulos y enriquece el siguiente documento con datos adicionales donde sea posible. Utiliza la información adicional proporcionada a continuación:\n\n"
-                f"{original_text}\n\n"
-                f"Datos Adicionales:{enrichment_data}"
-            )
-
-            # Función para obtener el texto enriquecido usando OpenRouter
-            def get_enriched_text(prompt):
-                api_key = st.secrets["OPENROUTER_API_KEY"]
-                url = "https://openrouter.ai/api/v1/chat/completions"
-                headers = {
-                    "Content-Type": "application/json",
-                    "Authorization": f"Bearer {api_key}"
-                }
-                data = {
-                    "model": "openai/gpt-4o-mini",
-                    "messages": [
-                        {
-                            "role": "user",
-                            "content": prompt
-                        }
-                    ]
-                }
-                response = requests.post(url, headers=headers, json=data)
-                if response.status_code == 200:
-                    response_json = response.json()
-                    return response_json['choices'][0]['message']['content']
-                else:
-                    st.error(f"Error en la API de OpenRouter: {response.status_code}")
-                    st.error(response.text)
+                    st.error("Formato de respuesta inesperado de la API de OpenRouter.")
                     return None
+            else:
+                st.error(f"Error en la API de OpenRouter: {response.status_code}")
+                st.error(response.text)
+                return None
 
-            with st.spinner("Enriqueciendo el documento..."):
-                enriched_text = get_enriched_text(prompt)
+        with st.spinner("Agregando subtítulos al documento..."):
+            subtitled_text = generate_subtitles(original_text)
 
-            if enriched_text:
-                st.subheader("Contenido Enriquecido del Documento")
-                st.text_area("", enriched_text, height=300)
+        if subtitled_text:
+            st.subheader("Documento con Subtítulos Agregados")
+            st.text_area("", subtitled_text, height=300)
 
-                # Crear un nuevo documento DOCX con el contenido enriquecido
-                new_doc = Document()
-                for line in enriched_text.split('\n'):
-                    if line.strip().startswith("### "):
-                        # Subtítulos de nivel 2
-                        new_doc.add_heading(line.replace("### ", ""), level=2)
-                    elif line.strip().startswith("## "):
-                        # Subtítulos de nivel 1
-                        new_doc.add_heading(line.replace("## ", ""), level=1)
-                    else:
-                        new_doc.add_paragraph(line)
+            # Crear un nuevo documento DOCX con los subtítulos
+            new_doc = Document()
+            for line in subtitled_text.split('\n'):
+                if line.strip().startswith("## "):
+                    # Subtítulos de nivel 1
+                    new_doc.add_heading(line.replace("## ", "").strip(), level=1)
+                else:
+                    new_doc.add_paragraph(line.strip())
 
-                # Guardar el nuevo documento en un objeto BytesIO
-                byte_io = io.BytesIO()
-                new_doc.save(byte_io)
-                byte_io.seek(0)
+            # Guardar el nuevo documento en un objeto BytesIO
+            byte_io = io.BytesIO()
+            new_doc.save(byte_io)
+            byte_io.seek(0)
 
-                st.success("¡Documento enriquecido creado con éxito!")
-                st.download_button(
-                    label="📥 Descargar Documento Enriquecido",
-                    data=byte_io,
-                    file_name="documento_enriquecido.docx",
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                )
+            st.success("¡Documento con subtítulos creado con éxito!")
+            st.download_button(
+                label="📥 Descargar Documento con Subtítulos",
+                data=byte_io,
+                file_name="documento_con_subtitulos.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            )
         else:
-            st.warning("No se pudieron extraer temas clave del documento para realizar búsquedas.")
+            st.warning("No se pudo generar el documento con subtítulos.")
     except Exception as e:
         st.error(f"Ocurrió un error al procesar el documento: {e}")
